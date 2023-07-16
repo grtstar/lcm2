@@ -648,7 +648,14 @@ static void emit_python_fromjson(const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
         lcm_member_t *lm = (lcm_member_t *) g_ptr_array_index(ls->members, m);
         if(! lcm_is_primitive_type(lm->type->lctypename))
         {
-            emit(2, "self.%s.from_dict(j[\"%s\"])", lm->membername, lm->membername);
+            if(lm->dimensions->len)
+            {
+                emit(2, "self.%s = [x.from_dict() for x in j[\"%s\"]]", lm->membername, lm->membername);
+            }
+            else
+            {
+                emit(2, "self.%s.from_dict(j[\"%s\"])", lm->membername, lm->membername);
+            }
         }
         else
         {
@@ -666,10 +673,19 @@ static void emit_python_tojson(const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
         lcm_member_t *lm = (lcm_member_t *) g_ptr_array_index(ls->members, m);
         if(! lcm_is_primitive_type(lm->type->lctypename))
         {
-            emit(2, "j[\"%s\"] = self.%s.to_dict()", lm->membername, lm->membername);
+            if(lm->dimensions->len)
+            {
+                emit(2, "j[\"%s\"] = [x.to_dict() for x in self.%s]", lm->membername, lm->membername);
+            }
+            else
+            {
+                emit(2, "j[\"%s\"] = self.%s.to_dict()", lm->membername, lm->membername);
+            }
         }
         else
+        {
             emit(2, "j[\"%s\"] = self.%s", lm->membername, lm->membername);
+        }
     }
     emit(2, "return j");
     fprintf(f, "\n");
