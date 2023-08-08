@@ -169,6 +169,44 @@ inline int LCM::publish(const std::string &channel, const MessageType *msg)
     return status;
 }
 
+#if LCM_CXX_11_ENABLED
+template <class MessageType, class MessageTypeRet>
+inline int LCM::send(const std::string &channel, const MessageType *msg, MessageTypeRet *ret, int timeout_ms,
+                    int retry_times)
+{
+    int r = -1;
+    int64_t start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    lcm::LCM::HandlerFunction<MessageTypeRet> handler = [&r, &ret](const lcm::ReceiveBuffer *rbuf,
+                                               const std::string &channel, const MessageTypeRet *res){
+            *ret = *res;                                    
+            r = 0;                                        
+    };
+    auto sub = subscribe(channel + "_result", handler);
+    for(int i=0; i< retry_times; i++)
+    {
+        int r1 = publish(channel, msg);
+        if(r1) return r1;
+        while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() - start < timeout_ms)
+        {
+            if(lcm_handle_thread_id == pthread_self() || lcm_handle_thread_id == 0)
+            {
+                handleTimeout(1);
+            }
+            else
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            if(r == 0) 
+            {
+                break;
+            }
+        }
+    }
+    unsubscribe(sub);
+    return r;
+}
+#endif
+
 inline int LCM::unsubscribe(Subscription *subscription)
 {
     if (!this->lcm) {
@@ -203,6 +241,7 @@ inline int LCM::handle()
         fprintf(stderr, "LCM instance not initialized.  Ignoring call to handle()\n");
         return -1;
     }
+    lcm_handle_thread_id = pthread_self();
     return lcm_handle(this->lcm);
 }
 
@@ -212,6 +251,7 @@ inline int LCM::handleTimeout(int timeout_millis)
         fprintf(stderr, "LCM instance not initialized.  Ignoring call to handle()\n");
         return -1;
     }
+    lcm_handle_thread_id = pthread_self();
     return lcm_handle_timeout(this->lcm, timeout_millis);
 }
 

@@ -16,6 +16,8 @@
 
 #if LCM_CXX_11_ENABLED
 #include <functional>
+#include <chrono>
+#include <thread>
 #endif
 
 namespace lcm {
@@ -103,7 +105,11 @@ class LCM {
      */
     template <class MessageType>
     inline int publish(const std::string &channel, const MessageType *msg);
-
+#if LCM_CXX_11_ENABLED
+    template <class MessageType, class MessageTypeRet>
+    inline int send(const std::string &channel, const MessageType *msg, MessageTypeRet *ret, int timeoutMs = 100,
+                    int retryTimes = 1);
+#endif
     /**
      * @brief Returns a file descriptor or socket that can be used with
      * @c select(), @c poll(), or other event loops for asynchronous
@@ -458,6 +464,7 @@ class LCM {
   private:
     lcm_t *lcm;
     bool owns_lcm;
+    pthread_t lcm_handle_thread_id;
 
     std::vector<Subscription *> subscriptions;
 };
