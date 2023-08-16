@@ -204,6 +204,24 @@ static void emit_package_namespace_close(lcmgen_t *lcmgen, FILE *f, lcm_struct_t
     g_strfreev(namespaces);
 }
 
+
+static void emit_jsoncpp_serdes(lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
+{
+    const char *sn = ls->structname->shortname;
+    emit(0, "#ifdef __NLOHMANN_JSON_CPP");
+    // NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(person, name, address, age)
+    emit_start(2, "%s\n", "public:");
+    emit_start(2, "%s%s, ", "NLOHMANN_DEFINE_TYPE_INTRUSIVE(", sn);
+    for (unsigned int mind = 0; mind < g_ptr_array_size(ls->members); mind++) {
+            lcm_member_t *lm = (lcm_member_t *) g_ptr_array_index(ls->members, mind);
+            emit_continue("%s", lm->membername);
+            if(mind < g_ptr_array_size(ls->members) - 1)
+                emit_continue(", ");
+        }
+    emit_end(")");
+    emit(0, "#endif");
+}
+
 /** Emit header file **/
 static void emit_header_start(lcmgen_t *lcmgen, FILE *f, lcm_struct_t *ls)
 {
@@ -344,6 +362,7 @@ static void emit_header_start(lcmgen_t *lcmgen, FILE *f, lcm_struct_t *ls)
         }
         emit(0, "");
     }
+    emit_jsoncpp_serdes(lcmgen, f, ls);
 
     emit(1, "public:");
     emit(2, "/**");
@@ -837,7 +856,6 @@ int emit_cpp(lcmgen_t *lcmgen)
             emit_decode_nohash(lcmgen, f, lr);
             emit_encoded_size_nohash(lcmgen, f, lr);
             emit_compute_hash(lcmgen, f, lr);
-
             emit_package_namespace_close(lcmgen, f, lr);
             emit(0, "#endif");
 
