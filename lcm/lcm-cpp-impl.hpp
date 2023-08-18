@@ -81,6 +81,37 @@ class LCMMHSubscription : public Subscription {
     }
 };
 
+template <class MessageType, class MessageTypeRet, class MessageHandlerClass>
+class LCMMHDefSubscription : public Subscription {
+    friend class LCM;
+
+  private:
+    MessageHandlerClass *handler;
+    MessageTypeRet (MessageHandlerClass::*handlerMethod)(const MessageType *msg);
+    static void cb_func(const lcm_recv_buf_t *rbuf, const char *channel, void *user_data)
+    {
+        LCMMHDefSubscription<MessageType, MessageTypeRet, MessageHandlerClass> *subs =
+            static_cast<LCMMHDefSubscription<MessageType, MessageTypeRet, MessageHandlerClass> *>(user_data);
+        MessageType msg;
+        int status = msg.decode(rbuf->data, 0, rbuf->data_size);
+        if (status < 0) {
+            fprintf(stderr, "error %d decoding %s!!!\n", status, MessageType::getTypeName());
+            return;
+        }
+        const ReceiveBuffer rb = {rbuf->data, rbuf->data_size, rbuf->recv_utime};
+        subs->channel_buf = channel;
+        MessageTypeRet r = (subs->handler->*subs->handlerMethod)(&msg);
+        unsigned int datalen = r.getEncodedSize();
+        uint8_t *buf = new uint8_t[datalen];
+        r.encode(buf, 0, datalen);
+        lcm_publish(rbuf->lcm, channel, buf, datalen);
+        std::string channel_result = channel;
+        channel_result += "_result";
+        lcm_publish(rbuf->lcm, channel_result.c_str(), buf, datalen);
+        delete buf;
+    }
+};
+
 template <class MessageHandlerClass>
 class LCMMHUntypedSubscription : public Subscription {
     friend class LCM;
@@ -276,6 +307,28 @@ Subscription *LCM::subscribe(const std::string &channel,
     subscriptions.push_back(subs);
     return subs;
 }
+
+  template <class MessageType, class MessageTypeRet, class MessageHandlerClass>
+    Subscription *LCM::defines(const std::string &channel,
+                            MessageTypeRet (MessageHandlerClass::*handlerMethod)(
+                                                                       const MessageType *msg),
+                            MessageHandlerClass *handler)
+{
+    if (!this->lcm) {
+        fprintf(stderr, "LCM instance not initialized.  Ignoring call to subscribe()\n");
+        return NULL;
+    }
+    LCMMHDefSubscription<MessageType, MessageTypeRet, MessageHandlerClass> *subs =
+        new LCMMHDefSubscription<MessageType, MessageTypeRet, MessageHandlerClass>();
+    subs->handler = handler;
+    subs->handlerMethod = handlerMethod;
+    subs->c_subs =
+        lcm_subscribe(this->lcm, channel.c_str(),
+                      LCMMHDefSubscription<MessageType, MessageTypeRet, MessageHandlerClass>::cb_func, subs);
+    subscriptions.push_back(subs);
+    return subs;
+}
+
 
 template <class MessageHandlerClass>
 Subscription *LCM::subscribe(const std::string &channel,

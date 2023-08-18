@@ -208,6 +208,13 @@ class LCM {
                                                                        const MessageType *msg),
                             MessageHandlerClass *handler);
 
+
+    template <class MessageType, class MessageTypeRet, class MessageHandlerClass>
+    Subscription *defines(const std::string &channel,
+                            MessageTypeRet (MessageHandlerClass::*handlerMethod)(
+                                                                       const MessageType *msg),
+                            MessageHandlerClass *handler);
+
     /**
      * @brief Subscribe a callback method of an object to a channel,
      * without automatic message decoding.
