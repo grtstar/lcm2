@@ -222,6 +222,23 @@ static void emit_jsoncpp_serdes(lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
     emit(0, "#endif");
 }
 
+static void emit_msgpack_serdes(lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
+{
+    const char *sn = ls->structname->shortname;
+    emit(0, "#ifdef __MSGPACK");
+    // MSGPACK_DEFINE(name, address, age)
+    emit_start(1, "%s\n", "public:");
+    emit_start(2, "%s%s, ", "MSGPACK_DEFINE(", sn);
+    for (unsigned int mind = 0; mind < g_ptr_array_size(ls->members); mind++) {
+            lcm_member_t *lm = (lcm_member_t *) g_ptr_array_index(ls->members, mind);
+            emit_continue("%s", lm->membername);
+            if(mind < g_ptr_array_size(ls->members) - 1)
+                emit_continue(", ");
+        }
+    emit_end(")");
+    emit(0, "#endif");
+}
+
 static void emit_operator_equal(lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
 {
     const char *sn = ls->structname->shortname;
@@ -381,6 +398,7 @@ static void emit_header_start(lcmgen_t *lcmgen, FILE *f, lcm_struct_t *ls)
         emit(0, "");
     }
     emit_jsoncpp_serdes(lcmgen, f, ls);
+    emit_msgpack_serdes(lcmgen, f, ls);
     emit_operator_equal(lcmgen, f, ls);
 
     emit(1, "public:");
