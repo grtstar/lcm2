@@ -765,6 +765,7 @@ static int lcm_udpm_handle(lcm_udpm_t *lcm)
     rbuf.data_size = lcmb->data_size;
     rbuf.recv_utime = lcmb->recv_utime;
     rbuf.lcm = lcm->lcm;
+    lcmb->data_offset = 0;
 
     g_static_rec_mutex_lock(&lcm->mutex);
     lcm_buf_free_data(lcmb, lcm->ringbuf);

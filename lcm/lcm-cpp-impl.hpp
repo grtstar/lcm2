@@ -32,7 +32,7 @@ class LCMTypedSubscription : public Subscription {
         MessageType msg;
         int status = msg.decode(rbuf->data, 0, rbuf->data_size);
         if (status < 0) {
-            fprintf(stderr, "error %d decoding %s!!!\n", status, MessageType::getTypeName());
+            fprintf(stderr, "error %d decoding %s on %s!!!\n", status, MessageType::getTypeName(), channel);
             return;
         }
         const ReceiveBuffer rb = {rbuf->data, rbuf->data_size, rbuf->recv_utime};
@@ -72,7 +72,7 @@ class LCMMHSubscription : public Subscription {
         MessageType msg;
         int status = msg.decode(rbuf->data, 0, rbuf->data_size);
         if (status < 0) {
-            fprintf(stderr, "error %d decoding %s!!!\n", status, MessageType::getTypeName());
+            fprintf(stderr, "error %d decoding %s on %s!!!\n", status, MessageType::getTypeName(), channel);
             return;
         }
         const ReceiveBuffer rb = {rbuf->data, rbuf->data_size, rbuf->recv_utime};
@@ -95,7 +95,7 @@ class LCMMHDefSubscription : public Subscription {
         MessageType msg;
         int status = msg.decode(rbuf->data, 0, rbuf->data_size);
         if (status < 0) {
-            fprintf(stderr, "error %d decoding %s!!!\n", status, MessageType::getTypeName());
+            fprintf(stderr, "error %d decoding %s on %s!!!\n", status, MessageType::getTypeName(), channel);
             return;
         }
         const ReceiveBuffer rb = {rbuf->data, rbuf->data_size, rbuf->recv_utime};
@@ -104,9 +104,8 @@ class LCMMHDefSubscription : public Subscription {
         unsigned int datalen = r.getEncodedSize();
         uint8_t *buf = new uint8_t[datalen];
         r.encode(buf, 0, datalen);
-        lcm_publish(rbuf->lcm, channel, buf, datalen);
         std::string channel_result = channel;
-        channel_result += "_result";
+        channel_result += "_Ack";
         lcm_publish(rbuf->lcm, channel_result.c_str(), buf, datalen);
         delete buf;
     }
@@ -212,7 +211,7 @@ inline int LCM::send(const std::string &channel, const MessageType *msg, Message
             *ret = *res;                                    
             r = 0;                                        
     };
-    auto sub = subscribe(channel + "_result", handler);
+    auto sub = subscribe(channel + "_Ack", handler);
     for(int i=0; i< retry_times; i++)
     {
         int r1 = publish(channel, msg);
