@@ -757,20 +757,11 @@ static int lcm_udpm_handle(lcm_udpm_t *lcm)
             perror("write to notify");
     g_static_rec_mutex_unlock(&lcm->mutex);
 
-    
     lcm_recv_buf_t rbuf;
-    rbuf.data = (uint8_t *) malloc(lcmb->data_size);
-    assert(rbuf.data);
-    memcpy(rbuf.data, lcmb->buf + lcmb->data_offset, lcmb->data_size);
+    rbuf.data = (uint8_t *) lcmb->buf + lcmb->data_offset;
     rbuf.data_size = lcmb->data_size;
     rbuf.recv_utime = lcmb->recv_utime;
     rbuf.lcm = lcm->lcm;
-    lcmb->data_offset = 0;
-
-    g_static_rec_mutex_lock(&lcm->mutex);
-    lcm_buf_free_data(lcmb, lcm->ringbuf);
-    lcm_buf_enqueue(lcm->inbufs_empty, lcmb);
-    g_static_rec_mutex_unlock(&lcm->mutex);
 
      if (lcm->creating_read_thread) {
         // special case:  If we're creating the read thread and are in
@@ -781,7 +772,11 @@ static int lcm_udpm_handle(lcm_udpm_t *lcm)
         lcm_dispatch_handlers(lcm->lcm, &rbuf, lcmb->channel_name);
     }
 
-    free(rbuf.data);
+    g_static_rec_mutex_lock(&lcm->mutex);
+    lcm_buf_free_data(lcmb, lcm->ringbuf);
+    lcm_buf_enqueue(lcm->inbufs_empty, lcmb);
+    g_static_rec_mutex_unlock(&lcm->mutex);
+
     return 0;
 }
 
