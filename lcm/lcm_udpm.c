@@ -253,6 +253,16 @@ static int _recv_message_fragment(lcm_udpm_t *lcm, lcm_buf_t *lcmb, uint32_t sz)
         fbuf = NULL;
     }
 
+    lcm_frag_key_t key_miss;
+    key_miss.from = &(lcmb->from);
+    key_miss.msg_seqno = msg_seqno - 3;
+    lcm_frag_buf_t *fbuf_miss = lcm_frag_buf_store_lookup(lcm->frag_bufs, &key_miss);
+    if (fbuf_miss) {
+        lcm_frag_buf_store_remove(lcm->frag_bufs, fbuf_miss);
+        dbg(DBG_LCM, "Dropping message (missing %d fragments)\n", fbuf_miss->fragments_remaining);
+    }
+
+
     //    printf ("fragment %d/%d (offset %d/%d) seq %d packet sz: %d %p\n",
     //        ntohs(hdr->fragment_no) + 1, fragments_in_msg,
     //        fragment_offset, data_size, msg_seqno, sz, fbuf);
@@ -282,7 +292,10 @@ static int _recv_message_fragment(lcm_udpm_t *lcm, lcm_buf_t *lcmb, uint32_t sz)
                                 data_size, fragments_in_msg, lcmb->recv_utime);
         lcm_frag_buf_store_add(lcm->frag_bufs, fbuf);
     }
-
+    else
+    {
+    }
+   
     if (channel!=NULL) {
         strncpy (fbuf->channel, channel, sizeof (fbuf->channel));
     }

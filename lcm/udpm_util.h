@@ -48,7 +48,7 @@ typedef int SOCKET;
 
 #define LCM_DEFAULT_RECV_BUFS 2000
 
-#define MAX_FRAG_BUF_TOTAL_SIZE (1 << 24)  // 16 megabytes
+#define MAX_FRAG_BUF_TOTAL_SIZE (1 << 21)  // 2 megabytes
 #define MAX_NUM_FRAG_BUFS 1000
 
 // HUGE is not defined on cygwin as of 2008-03-05
