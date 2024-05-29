@@ -70,7 +70,7 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
     shm_msgr_t msgr = {0};
     if(shm_read(lcm->shm, lcm->msg_no, &msgr))
     {
-        printf("lcm_shm_handle: got msg: %d\n", msgr.msg.msg_num);
+        printf("lcm_shm_handle: got msg: %d, %s\n", msgr.msg.msg_num, msgr.msg.channel);
 
         lcm->msg_no = msgr.msg.msg_num;
         lcm_recv_buf_t rbuf;
