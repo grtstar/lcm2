@@ -206,9 +206,10 @@ bool shm_read(shm_t *header, uint32_t msg_num, shm_msgr_t *msgr)
     while(true)
     {
         int len = _fifo_touch(&header->fifo, pos, &msg, sizeof(shm_msg_t));
+        pos += len;
         if(msg.msg_num <= msg_num)
         {
-            pos += len + msg.size;
+            pos += msg.size;
         }
         else
         {
