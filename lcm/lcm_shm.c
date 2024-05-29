@@ -94,7 +94,6 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
     }
     else
     {
-        printf("lcm_shm_handle: no message");
         usleep(10);
     }
     return 0;
