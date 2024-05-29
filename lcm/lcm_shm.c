@@ -61,6 +61,7 @@ static int lcm_shm_publish(lcm_shm_t *lcm, const char *channel, const void *data
                             unsigned int datalen)
 {
     bool succ = false;
+    printf("lcm_shm_publish: %s, %d\n", channel, datalen);
     succ = shm_publish(lcm->shm, channel, data, datalen);
     return succ ? 0 : -1;
 }
@@ -70,7 +71,7 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
     shm_msgr_t msgr = {0};
     if(shm_read(lcm->shm, lcm->msg_no, &msgr))
     {
-        printf("lcm_shm_handle: got msg: %d, %s\n", msgr.msg.msg_num, msgr.msg.channel);
+        printf("lcm_shm_handle: got msg: %d, %s, size: %d\n", msgr.msg.msg_num, msgr.msg.channel, msgr.msg.size);
         if (!lcm_try_enqueue_message(lcm->lcm, msgr.msg.channel))
         {
             return 0;
