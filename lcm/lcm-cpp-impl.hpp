@@ -205,7 +205,6 @@ inline int LCM::send(const std::string &channel, const MessageType *msg, Message
                     int retry_times)
 {
     int r = -1;
-    int64_t start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     lcm::LCM::HandlerFunction<MessageTypeRet> handler = [&r, &ret](const lcm::ReceiveBuffer *rbuf,
                                                const std::string &channel, const MessageTypeRet *res){
             *ret = *res;                                    
@@ -214,6 +213,7 @@ inline int LCM::send(const std::string &channel, const MessageType *msg, Message
     auto sub = subscribe(channel + "_Ack", handler);
     for(int i=0; i< retry_times; i++)
     {
+        int64_t start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
         int r1 = publish(channel, msg);
         if(r1) return r1;
         while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() - start < timeout_ms)

@@ -10,11 +10,22 @@ set(lcm_sources
   lcm_mpudpm.c
   lcm_tcpq.c
   lcm_udpm.c
+  lcm_shm.c
   ringbuffer.c
   udpm_util.c
   lcmtypes/channel_port_map_update_t.c
   lcmtypes/channel_to_port_t.c
+  ipcshm/ipcshm.c
 )
+
+set(lockfree_sources
+  lockfree/lf_bcast.c
+  lockfree/lf_pool.c
+  lockfree/lf_queue.c
+  lockfree/lf_shm.c
+)
+
+set_property(SOURCE ${lockfree_sources} PROPERTY COMPILE_OPTIONS -std=c11)
 
 set(lcm_install_headers
   eventlog.h
@@ -42,12 +53,15 @@ add_library(lcm-coretypes INTERFACE)
 add_library(lcm-static STATIC ${lcm_sources})
 add_library(lcm SHARED ${lcm_sources})
 
+
 foreach(lcm_lib lcm lcm-static)
   target_compile_definitions(${lcm_lib} PRIVATE
     _FILE_OFFSET_BITS=64
     _LARGEFILE_SOURCE
     _REENTRANT
   )
+
+  #target_compile_options(${lcm_lib} PRIVATE -march=aarch64)
 
   set_target_properties(${lcm_lib} PROPERTIES
     VERSION ${LCM_VERSION}
@@ -63,6 +77,7 @@ foreach(lcm_lib lcm lcm-static)
   target_link_libraries(${lcm_lib} PRIVATE
     GLib2::glib
     ${CMAKE_THREAD_LIBS_INIT}
+    rt
   )
 endforeach()
 

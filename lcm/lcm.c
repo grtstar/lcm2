@@ -54,6 +54,7 @@ extern void lcm_logprov_provider_init(GPtrArray *providers);
 extern void lcm_tcpq_provider_init(GPtrArray *providers);
 extern void lcm_mpudpm_provider_init(GPtrArray *providers);
 extern void lcm_memq_provider_init(GPtrArray *providers);
+extern void lcm_shm_provider_init(GPtrArray *providers);
 
 lcm_t *lcm_create(const char *url)
 {
@@ -77,6 +78,7 @@ lcm_t *lcm_create(const char *url)
     lcm_tcpq_provider_init(providers);
     lcm_mpudpm_provider_init(providers);
     lcm_memq_provider_init(providers);
+    lcm_shm_provider_init(providers);
     if (providers->len == 0) {
         fprintf(stderr, "Error: no LCM providers found\n");
         goto fail;
@@ -214,6 +216,10 @@ int lcm_handle_timeout(lcm_t *lcm, int timeout_milis)
     fd_set fds;
     FD_ZERO(&fds);
     SOCKET lcm_fd = lcm_get_fileno(lcm);
+    if(lcm_fd < 0)
+    {
+        return lcm_handle(lcm);
+    }
     FD_SET(lcm_fd, &fds);
 
     struct timeval timeout;
