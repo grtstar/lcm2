@@ -108,6 +108,12 @@ lcm_provider_t *lcm_shm_create(lcm_t *parent, const char *network, const GHashTa
     self->lcm = parent;
     self->msg_no = 0;
     self->shm = shm_create(4*1024*1024, true);
+    if(!self->shm)
+    {
+        perror("shm_create failed\n");
+        free(self);
+        return NULL;
+    }
     return self;
 }
 

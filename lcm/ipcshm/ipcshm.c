@@ -171,6 +171,7 @@ void shm_deinit(shm_t *header)
 
 bool shm_publish(shm_t *header, const char *channel, const void *data, uint32_t datalen)
 {
+    printf("datalen = %d, header->fifo.size = %d, sizeof(shm_msg_t) = %d\n", datalen, header->fifo.size, sizeof(shm_msg_t));
     assert(datalen > header->fifo.size - sizeof(shm_msg_t));
     int len = strlen(channel);
     assert(len >= 256);
