@@ -42,6 +42,7 @@ struct _lcm_provider_t {
 void lcm_shm_destroy(lcm_shm_t *lcm)
 {
     dbg(DBG_LCM, "closing lcm context\n");
+    printf("lcm_shm_destroy: closing lcm context");
     shm_deinit(lcm->shm);
     free(lcm);
 }
@@ -67,8 +68,11 @@ static int lcm_shm_publish(lcm_shm_t *lcm, const char *channel, const void *data
 static int lcm_shm_handle(lcm_shm_t *lcm)
 {
     shm_msgr_t msgr;
+    printf("lcm_shm_handle\n");
     if(shm_read(lcm->shm, lcm->msg_no, &msgr))
     {
+        printf("lcm_shm_handle: got msg: %d\n", msgr.msg.msg_num);
+
         lcm->msg_no = msgr.msg.msg_num;
         lcm_recv_buf_t rbuf;
         if(!msgr.buff)
@@ -87,6 +91,7 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
     }
     else
     {
+        printf("lcm_shm_handle: no message");
         usleep(10);
     }
     return 0;
