@@ -416,6 +416,7 @@ int lcm_dispatch_handlers(lcm_t *lcm, lcm_recv_buf_t *buf, const char *channel)
     // so that we don't iterate over handlers that are added during the
     // callbacks.
     int nhandlers = handlers->len;
+    printf("nhandlers: %d\n", nhandlers);
     for (int i = 0; i < nhandlers; i++) {
         lcm_subscription_t *h = (lcm_subscription_t *) g_ptr_array_index(handlers, i);
         h->callback_scheduled = 1;
