@@ -57,11 +57,22 @@ static int lcm_shm_subscribe(lcm_shm_t *lcm, const char *channel)
     return 0;
 }
 
+void debug_data(const void *data, unsigned int datalen)
+{
+    int i;
+    for(i = 0; i < datalen; i++)
+    {
+        printf("%02x ", ((unsigned char *)data)[i]);
+    }
+    printf("\n");
+}
+
 static int lcm_shm_publish(lcm_shm_t *lcm, const char *channel, const void *data,
                             unsigned int datalen)
 {
     bool succ = false;
     printf("lcm_shm_publish: %s, %d\n", channel, datalen);
+    debug_data(data, datalen);
     succ = shm_publish(lcm->shm, channel, data, datalen);
     return succ ? 0 : -1;
 }
@@ -89,6 +100,7 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
         rbuf.data_size = msgr.msg.size;
         rbuf.recv_utime = lcm_timestamp_now();
         rbuf.lcm = lcm->lcm;
+        debug_data(rbuf.data, rbuf.data_size);
         lcm_dispatch_handlers(lcm->lcm, &rbuf, msgr.msg.channel);
         if(msgr.buff)
         {
