@@ -67,7 +67,7 @@ static int lcm_shm_publish(lcm_shm_t *lcm, const char *channel, const void *data
 
 static int lcm_shm_handle(lcm_shm_t *lcm)
 {
-    shm_msgr_t msgr;
+    shm_msgr_t msgr = {0};
     printf("lcm_shm_handle\n");
     if(shm_read(lcm->shm, lcm->msg_no, &msgr))
     {
@@ -87,7 +87,10 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
         rbuf.recv_utime = lcm_timestamp_now();
         rbuf.lcm = lcm->lcm;
         lcm_dispatch_handlers(lcm->lcm, &rbuf, msgr.msg.channel);
-        free(msgr.buff);
+        if(msgr.buff)
+        {
+            free(msgr.buff);
+        }
     }
     else
     {
