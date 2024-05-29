@@ -42,7 +42,7 @@ struct _lcm_provider_t {
 void lcm_shm_destroy(lcm_shm_t *lcm)
 {
     dbg(DBG_LCM, "closing lcm context\n");
-    printf("lcm_shm_destroy: closing lcm context");
+    printf("lcm_shm_destroy: closing lcm context\n");
     shm_deinit(lcm->shm);
     free(lcm);
 }
@@ -71,7 +71,10 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
     if(shm_read(lcm->shm, lcm->msg_no, &msgr))
     {
         printf("lcm_shm_handle: got msg: %d, %s\n", msgr.msg.msg_num, msgr.msg.channel);
-
+        if (!lcm_try_enqueue_message(lcm->lcm, msgr.msg.channel))
+        {
+            return 0;
+        }
         lcm->msg_no = msgr.msg.msg_num;
         lcm_recv_buf_t rbuf;
         if(!msgr.buff)
