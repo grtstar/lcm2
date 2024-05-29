@@ -216,12 +216,14 @@ bool shm_read(shm_t *header, uint32_t msg_num, shm_msgr_t *msgr)
             {
                 msgr->msg.size = msg.size;
                 msgr->msg.msg_num = msg.msg_num;
+                strcpy(msgr->msg.channel, msg.channel);
                 _fifo_touch(&header->fifo, pos, msgr->msg.data, msg.size);
             }
             else
             {
                 msgr->msg.size = msg.size;
                 msgr->msg.msg_num = msg.msg_num;
+                strcpy(msgr->msg.channel, msg.channel);
                 msgr->buff = (uint8_t *)malloc(msg.size);
                 _fifo_touch(&header->fifo, pos, msgr->buff, msg.size);
             }
