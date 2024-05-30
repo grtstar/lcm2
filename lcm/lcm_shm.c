@@ -25,6 +25,7 @@
 
 #define LF_ALIGN_UP(s, a)            (((s)+((a)-1))&~((a)-1))
 #define LF_IS_POW2(s)                ((!!(s))&(!((s)&((s)-1))))
+#define SHM_FIFO    "/tmp/shm_fifo"
 
 
 typedef struct _lcm_provider_t lcm_shm_t;
@@ -36,20 +37,24 @@ struct _lcm_provider_t {
     GStaticMutex transmit_lock;  // so that only thread at a time can transmit
     shm_t *shm;
     uint32_t msg_no;
+    int fifo_fd;
 };
 
 
 void lcm_shm_destroy(lcm_shm_t *lcm)
 {
-    dbg(DBG_LCM, "closing lcm context\n");
-    printf("lcm_shm_destroy: closing lcm context\n");
+    dbg(DBG_LCM, "lcm_shm_destroy: closing lcm context\n");
     shm_deinit(lcm->shm);
+    if(lcm->fifo_fd >= 0)
+    {
+        close(lcm->fifo_fd);
+    }
     free(lcm);
 }
 
 static int lcm_shm_get_fileno(lcm_shm_t *lcm)
 {
-    return -1;
+    return lcm->fifo_fd;
 }
 
 static int lcm_shm_subscribe(lcm_shm_t *lcm, const char *channel)
@@ -71,25 +76,30 @@ static int lcm_shm_publish(lcm_shm_t *lcm, const char *channel, const void *data
                             unsigned int datalen)
 {
     bool succ = false;
-    printf("lcm_shm_publish: %s, %d\n", channel, datalen);
-    debug_data(data, datalen);
+    dbg(DBG_LCM, "lcm_shm_publish: %s, %d\n", channel, datalen);
     succ = shm_publish(lcm->shm, channel, data, datalen);
     return succ ? 0 : -1;
 }
 
 static int lcm_shm_handle(lcm_shm_t *lcm)
 {
+    usleep(10);
     shm_msgr_t msgr = {0};
     if(shm_read(lcm->shm, lcm->msg_no, &msgr))
     {
-        printf("lcm_shm_handle: got msg: %d, %s, size: %d\n", msgr.msg.msg_num, msgr.msg.channel, msgr.msg.size);
-        if (!lcm_try_enqueue_message(lcm->lcm, msgr.msg.channel))
+        //printf("lcm_shm_handle: got msg: %d, %s, size: %d\n", msgr.msg.msg_num, msgr.msg.channel, msgr.msg.size);
+        if (!lcm_try_enqueue_message(lcm->lcm, msgr.msg.header.channel))
         {
+            lcm->msg_no = msgr.msg.header.msg_num;
+            if(msgr.buff)
+            {
+                free(msgr.buff);
+            }
             return 0;
         }
-        lcm->msg_no = msgr.msg.msg_num;
+        lcm->msg_no = msgr.msg.header.msg_num;
         lcm_recv_buf_t rbuf;
-        if(!msgr.buff)
+        if(msgr.buff != NULL)
         {
             rbuf.data = msgr.buff;
         }
@@ -97,11 +107,10 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
         {
             rbuf.data = msgr.msg.data;
         }
-        rbuf.data_size = msgr.msg.size;
+        rbuf.data_size = msgr.msg.header.size;
         rbuf.recv_utime = lcm_timestamp_now();
         rbuf.lcm = lcm->lcm;
-        debug_data(rbuf.data, rbuf.data_size);
-        lcm_dispatch_handlers(lcm->lcm, &rbuf, msgr.msg.channel);
+        lcm_dispatch_handlers(lcm->lcm, &rbuf, msgr.msg.header.channel);
         if(msgr.buff)
         {
             free(msgr.buff);
@@ -109,7 +118,7 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
     }
     else
     {
-        usleep(10);
+        usleep(100);
     }
     return 0;
 }
@@ -128,13 +137,25 @@ lcm_provider_t *lcm_shm_create(lcm_t *parent, const char *network, const GHashTa
 {
     lcm_shm_t *self = (lcm_shm_t *) calloc(1, sizeof(lcm_shm_t));
     self->lcm = parent;
-    self->msg_no = 0;
-    self->shm = shm_create(4*1024*1024, true);
+    self->shm = shm_create(4*1024*1024 ,true);
     if(!self->shm)
     {
         perror("shm_create failed\n");
         free(self);
         return NULL;
+    }
+    self->msg_no = shm_get_lastest_msg_num(self->shm);
+    int fd = open(SHM_FIFO, O_RDWR | O_NONBLOCK);
+    if(fd < 0)
+    {
+        mkfifo(SHM_FIFO, 0666);
+        fd = open(SHM_FIFO, O_RDWR | O_NONBLOCK);
+    }
+    self->fifo_fd = fd;
+    if(self->fifo_fd >= 0)
+    {
+        uint8_t t[1] = {0};
+        write(self->fifo_fd, &t, 1);
     }
     return self;
 }

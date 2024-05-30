@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 
 #include "ipcshm.h"
 
@@ -66,7 +67,7 @@ static int _fifo_touch(shm_fifo_t *fifo, int pos, void *items, uint32_t len)
 	//映射指向地址变量
     uint8_t *buffer = (uint8_t *)items;
     // 获取 fifo 中非空闲长度 
-    uint32_t out = fifo->out + pos;
+    uint32_t out = fifo->out > pos ? fifo->out : pos;
     len = min(len, fifo->in - out);
     //获取 fifo当前出列到out位置
     if(items != NULL)
@@ -77,7 +78,7 @@ static int _fifo_touch(shm_fifo_t *fifo, int pos, void *items, uint32_t len)
         // 复制剩下的数据
         memcpy(buffer + l, fifo->data, (len - l));
     }
-    return len;	//返回len长度
+    return len + out;	//返回len长度
 }
 
 static int _fifo_drop(shm_fifo_t *fifo, uint32_t len)
@@ -97,11 +98,41 @@ bool fifo_is_empty(shm_fifo_t *fifo)
     return fifo->in == fifo->out;
 }
 
+bool lock(pthread_mutex_t *mutex)
+{
+    int r = pthread_mutex_lock(mutex);
+    if(r == EOWNERDEAD)
+    {
+        perror("lock dead\n");
+        pthread_mutex_consistent(mutex);
+        pthread_mutex_unlock(mutex);
+        return false;
+    }
+    return true;
+}
+
+void unlock(pthread_mutex_t *mutex)
+{
+    pthread_mutex_unlock(mutex);
+}
+
+int shm_get_lastest_msg_num(shm_t * header)
+{
+    int r = 0;
+    if(!lock(&header->mutex))
+    {
+        lock(&header->mutex);
+    }
+    r = header->last_msg_num;
+    unlock(&header->mutex);
+    return r;
+}
+
 shm_t * shm_create(uint32_t size, bool sharem)
 {
     if(sharem)
     {
-        int shm_fd = shm_open("/ipcshm", O_CREAT | O_RDWR, 0666);
+        int shm_fd = shm_open("/ipcshm005", O_CREAT | O_RDWR, 0666);
         if (shm_fd == -1) {
             perror("shm_open");
             return NULL;
@@ -132,6 +163,7 @@ shm_t * shm_create(uint32_t size, bool sharem)
             pthread_mutexattr_t attr;
             pthread_mutexattr_init(&attr);
             pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+            pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
             pthread_mutex_init(&header->mutex, &attr);
         }
         return header;
@@ -171,66 +203,83 @@ void shm_deinit(shm_t *header)
 
 bool shm_publish(shm_t *header, const char *channel, const void *data, uint32_t datalen)
 {
-    assert(datalen <= header->fifo.size - sizeof(shm_msg_t));
+    assert(datalen <= header->fifo.size - sizeof(shm_msg_header_t));
     int len = strlen(channel);
     assert(len < 256);
-    pthread_mutex_lock(&header->mutex);
-    while(fifo_get_remain_size(&header->fifo) < datalen + sizeof(shm_msg_t))
+    if(!lock(&header->mutex))
+    {
+        lock(&header->mutex);
+    }
+    while(fifo_get_remain_size(&header->fifo) < datalen + sizeof(shm_msg_header_t))
     {
         shm_msg_t msg = {0};
-        uint32_t len = _fifo_get(&header->fifo, &msg, sizeof(shm_msg_t));
-        len = _fifo_drop(&header->fifo,  msg.size);
+        uint32_t len = _fifo_get(&header->fifo, &msg, sizeof(shm_msg_header_t));
+        len = _fifo_drop(&header->fifo,  msg.header.size);
     }
     {
         shm_msg_t msg = {0};
-        msg.size = datalen;
-        strcpy(msg.channel, channel);
-        msg.msg_num = ++ header->last_msg_num;
-        _fifo_put(&header->fifo, &msg, sizeof(shm_msg_t));
+        msg.header.size = datalen;
+        strcpy(msg.header.channel, channel);
+        msg.header.msg_num = ++ header->last_msg_num;
+        _fifo_put(&header->fifo, &msg, sizeof(shm_msg_header_t));
         _fifo_put(&header->fifo, data, datalen);
     }
-    pthread_mutex_unlock(&header->mutex);
+    unlock(&header->mutex);
     return true;
 }
 
+int last_msg_pos = 0;
 bool shm_read(shm_t *header, uint32_t msg_num, shm_msgr_t *msgr)
 {
-    pthread_mutex_lock(&header->mutex);
+    if(!lock(&header->mutex))
+    {
+        return false;
+    }
+    
     if(header->last_msg_num == msg_num)
     {
-        pthread_mutex_unlock(&header->mutex);
+        unlock(&header->mutex);
         return false;
     }
     shm_msg_t msg = {0};
-    int pos = 0;
+    if(last_msg_pos == 0)
+    {
+        last_msg_pos = header->fifo.out;
+    }
+    int pos = last_msg_pos;
     while(true)
     {
-        int len = _fifo_touch(&header->fifo, pos, &msg, sizeof(shm_msg_t));
-        pos += len;
-        if(msg.msg_num <= msg_num)
+        pos = _fifo_touch(&header->fifo, pos, &msg, sizeof(shm_msg_header_t));
+        if(msg.header.msg_num == 0)
         {
-            pos += msg.size;
+            break;
+        }
+        if(msg.header.msg_num <= msg_num)
+        {
+            pos += msg.header.size;
         }
         else
         {
-            if(msg.size < msgr->msg.size)
+            if(msg.header.size < sizeof(msgr->msg.data))
             {
-                msgr->msg.size = msg.size;
-                msgr->msg.msg_num = msg.msg_num;
-                strcpy(msgr->msg.channel, msg.channel);
-                _fifo_touch(&header->fifo, pos, msgr->msg.data, msg.size);
+                msgr->msg.header.size = msg.header.size;
+                msgr->msg.header.msg_num = msg.header.msg_num;
+                strcpy(msgr->msg.header.channel, msg.header.channel);
+                pos = _fifo_touch(&header->fifo, pos, msgr->msg.data, msg.header.size);
             }
             else
             {
-                msgr->msg.size = msg.size;
-                msgr->msg.msg_num = msg.msg_num;
-                strcpy(msgr->msg.channel, msg.channel);
-                msgr->buff = (uint8_t *)malloc(msg.size);
-                _fifo_touch(&header->fifo, pos, msgr->buff, msg.size);
+
+                msgr->msg.header.size = msg.header.size;
+                msgr->msg.header.msg_num = msg.header.msg_num;
+                strcpy(msgr->msg.header.channel, msg.header.channel);
+                msgr->buff = (uint8_t *)malloc(msg.header.size);
+                pos = _fifo_touch(&header->fifo, pos, msgr->buff, msg.header.size);
             }
             break;
         }
     }
-    pthread_mutex_unlock(&header->mutex);
+    last_msg_pos = pos;
+    unlock(&header->mutex);
     return true;
 }
