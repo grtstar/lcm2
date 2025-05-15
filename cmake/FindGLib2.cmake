@@ -5,17 +5,29 @@ include(FindPackageHandleStandardArgs)
 #------------------------------------------------------------------------------
 function(_glib2_find_include VAR HEADER)
   list(APPEND CMAKE_PREFIX_PATH $ENV{GLIB_PATH})
-
   set(_paths)
   foreach(_lib ${ARGN})
     get_filename_component(_libpath ${GLIB2_${_lib}_LIBRARY} DIRECTORY)
+    message(STATUS "Library path for ${_lib}: ${_libpath}")
     list(APPEND _paths ${_libpath})
   endforeach()
+  message(STATUS "_paths: ${_paths}")
+  message(STATUS "VAR: ${VAR}")
+  message(STATUS "HEADER: ${HEADER}")
 
+    # 打印所有搜索路径
+    foreach(_path ${_paths})
+    message(STATUS "Searching in path: ${_path}")
+    foreach(_suffix glib-2.0 glib-2.0/include)
+      message(STATUS "Searching in path with suffix: ${_path}/${_suffix}")
+    endforeach()
+  endforeach()
+  
   find_path(GLIB2_${VAR}_INCLUDE_DIR ${HEADER}
     PATHS ${_paths}
     PATH_SUFFIXES glib-2.0 glib-2.0/include
   )
+  message(STATUS "GLIB2_${VAR}_INCLUDE_DIR: ${GLIB2_${VAR}_INCLUDE_DIR}")
   mark_as_advanced(GLIB2_${VAR}_INCLUDE_DIR)
 endfunction()
 

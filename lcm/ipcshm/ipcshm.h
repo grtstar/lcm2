@@ -6,7 +6,7 @@
 typedef struct shm_msg_header_t
 {
     uint32_t size;
-    uint32_t msg_num;
+    uint16_t msg_num;
     char channel[256];
 }shm_msg_header_t;
 

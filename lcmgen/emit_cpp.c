@@ -220,6 +220,26 @@ static void emit_jsoncpp_serdes(lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
         }
     emit_end(")");
     emit(0, "#endif");
+
+    emit(0, "#ifdef __NLOHMANN_JSON_CPP_WITH_DEFAULT");
+    // NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(person, name, address, age)
+    emit_start(1, "%s\n", "public:");
+    emit_start(2, "%s()\n", sn);
+    emit_start(2, "{\n");
+    for (unsigned int mind = 0; mind < g_ptr_array_size(ls->members); mind++) {
+            lcm_member_t *lm = (lcm_member_t *) g_ptr_array_index(ls->members, mind);
+            emit_start(3, "%s = {0};\n", lm->membername);
+        }
+    emit_start(2, "}\n");
+    emit_start(2, "%s%s, ", "NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(", sn);
+    for (unsigned int mind = 0; mind < g_ptr_array_size(ls->members); mind++) {
+            lcm_member_t *lm = (lcm_member_t *) g_ptr_array_index(ls->members, mind);
+            emit_continue("%s", lm->membername);
+            if(mind < g_ptr_array_size(ls->members) - 1)
+                emit_continue(", ");
+        }
+    emit_end(")");
+    emit(0, "#endif");
 }
 
 static void emit_msgpack_serdes(lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)

@@ -83,7 +83,7 @@ static int lcm_shm_publish(lcm_shm_t *lcm, const char *channel, const void *data
 
 static int lcm_shm_handle(lcm_shm_t *lcm)
 {
-    usleep(10);
+    usleep(100);
     shm_msgr_t msgr = {0};
     if(shm_read(lcm->shm, lcm->msg_no, &msgr))
     {
@@ -118,7 +118,7 @@ static int lcm_shm_handle(lcm_shm_t *lcm)
     }
     else
     {
-        usleep(100);
+        usleep(1000);
     }
     return 0;
 }

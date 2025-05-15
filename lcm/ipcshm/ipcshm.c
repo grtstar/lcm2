@@ -62,13 +62,17 @@ static int _fifo_get(shm_fifo_t *fifo, void *items, uint32_t len)
     return len;	//返回len长度
 }
 
-static int _fifo_touch(shm_fifo_t *fifo, int pos, void *items, uint32_t len)
+static int _fifo_touch(shm_fifo_t *fifo, uint32_t pos, void *items, uint32_t len)
 {
 	//映射指向地址变量
     uint8_t *buffer = (uint8_t *)items;
     // 获取 fifo 中非空闲长度 
     uint32_t out = fifo->out > pos ? fifo->out : pos;
     len = min(len, fifo->in - out);
+    if(len <= 0)
+    {
+        return out;
+    }
     //获取 fifo当前出列到out位置
     if(items != NULL)
     {
@@ -132,7 +136,7 @@ shm_t * shm_create(uint32_t size, bool sharem)
 {
     if(sharem)
     {
-        int shm_fd = shm_open("/ipcshm005", O_CREAT | O_RDWR, 0666);
+        int shm_fd = shm_open("/ipcshm000", O_CREAT | O_RDWR, 0666);
         if (shm_fd == -1) {
             perror("shm_open");
             return NULL;
@@ -210,17 +214,27 @@ bool shm_publish(shm_t *header, const char *channel, const void *data, uint32_t 
     {
         lock(&header->mutex);
     }
+    int count = 0;
     while(fifo_get_remain_size(&header->fifo) < datalen + sizeof(shm_msg_header_t))
     {
         shm_msg_t msg = {0};
         uint32_t len = _fifo_get(&header->fifo, &msg, sizeof(shm_msg_header_t));
         len = _fifo_drop(&header->fifo,  msg.header.size);
+
+        if(count++ > 65535)
+        {
+            printf("fifo in = %d, out = %d\n", header->fifo.in, header->fifo.out);
+        }
     }
     {
         shm_msg_t msg = {0};
         msg.header.size = datalen;
         strcpy(msg.header.channel, channel);
         msg.header.msg_num = ++ header->last_msg_num;
+        if(msg.header.msg_num == 0)
+        {
+            msg.header.msg_num = ++ header->last_msg_num;
+        }
         _fifo_put(&header->fifo, &msg, sizeof(shm_msg_header_t));
         _fifo_put(&header->fifo, data, datalen);
     }
@@ -228,7 +242,13 @@ bool shm_publish(shm_t *header, const char *channel, const void *data, uint32_t 
     return true;
 }
 
-int last_msg_pos = 0;
+bool compare_msgnum(uint16_t a, uint16_t b)
+{
+    int16_t r = a - b;
+    return r >= 0;
+}
+
+uint32_t last_msg_pos = 0;
 bool shm_read(shm_t *header, uint32_t msg_num, shm_msgr_t *msgr)
 {
     if(!lock(&header->mutex))
@@ -246,15 +266,25 @@ bool shm_read(shm_t *header, uint32_t msg_num, shm_msgr_t *msgr)
     {
         last_msg_pos = header->fifo.out;
     }
-    int pos = last_msg_pos;
+    uint32_t pos = last_msg_pos;
+    int count = 0;
     while(true)
     {
+       
         pos = _fifo_touch(&header->fifo, pos, &msg, sizeof(shm_msg_header_t));
-        if(msg.header.msg_num == 0)
+        if(count++ > 65535)
         {
-            break;
+            printf("fifo in = %u, out = %u\n", header->fifo.in, header->fifo.out);
+            printf("pos = %u, last_msg_pos = %u\n", pos, last_msg_pos);
+            printf("msg_num = %u, msg.header.msg_num = %u\n", msg_num, msg.header.msg_num);
+            printf("msg.header.size = %u, msg.header.channel = %s \n", msg.header.size, msg.header.channel);
         }
-        if(msg.header.msg_num <= msg_num)
+        if(msg.header.size == 0)
+        {
+            unlock(&header->mutex);
+            return false;
+        }
+        if(compare_msgnum(msg_num, msg.header.msg_num)) //if(msg.header.msg_num <= msg_num)
         {
             pos += msg.header.size;
         }
