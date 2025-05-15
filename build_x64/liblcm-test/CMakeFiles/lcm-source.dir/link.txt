@@ -1,1 +1,0 @@
-/usr/bin/cc  -std=gnu99 -Wno-format-zero-length  -rdynamic CMakeFiles/lcm-source.dir/lcm-source.c.o  -o lcm-source  -Wl,-rpath,/home/grt/ls/reality/depends/third_party/lcm2/build_x64/lcm: ../lcm/liblcm.so.1.4.0 

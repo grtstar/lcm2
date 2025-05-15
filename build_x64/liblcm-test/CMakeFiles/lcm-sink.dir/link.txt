@@ -1,1 +1,0 @@
-/usr/bin/cc  -std=gnu99 -Wno-format-zero-length  -rdynamic CMakeFiles/lcm-sink.dir/lcm-sink.c.o  -o lcm-sink  -Wl,-rpath,/home/grt/ls/reality/depends/third_party/lcm2/build_x64/lcm: ../lcm/liblcm.so.1.4.0 
