@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <errno.h>
 
+#include "dbg.h"
 #include "ipcshm.h"
 
 #define max(a,b)    (((a) > (b)) ? (a) : (b)) 
@@ -37,29 +38,29 @@ static int _fifo_put(shm_fifo_t *fifo, void *items, uint32_t len)
     uint8_t *buffer = (uint8_t *)items;	//获取当前消息数据载入缓冲区
     // 获取 fifo 中空闲长度 
     len = min(len, fifo->size - fifo->in + fifo->out);
-	//获取fifo 当前存入in的位置
+	//获取 fifo 当前存入 in 的位置
     uint32_t l = min(len, fifo->size - (fifo->in & (fifo->size - 1)));
-    //载入的buffer数据到_msgfifo队列中，存入in 位置 超出后回到 size 的 0 位置，循环这样
+    //载入的 buffer 数据到_msgfifo 队列中，存入 in 位置 超出后回到 size 的 0 位置，循环这样
 	memcpy((uint8_t *)fifo->data + (fifo->in & (fifo->size - 1)), buffer, l);
     memcpy(fifo->data, buffer + l , (len - l));
-    fifo->in += len; //将 fifo载入的位置 in 更新
-    return len; //返回len长度
+    fifo->in += len; //将 fifo 载入的位置 in 更新
+    return len; //返回 len 长度
 }
-//fifo消息出列
+//fifo 消息出列
 static int _fifo_get(shm_fifo_t *fifo, void *items, uint32_t len)
 {
 	//映射指向地址变量
     uint8_t *buffer = (uint8_t *)items;
     // 获取 fifo 中非空闲长度 
     len = min(len, fifo->in - fifo->out);
-    //获取 fifo当前出列到out位置
+    //获取 fifo 当前出列到 out 位置
     uint32_t l = min(len, fifo->size - (fifo->out & (fifo->size - 1)));
     // 复制从 fifo->out 到尾部的数据
     memcpy(buffer, (uint8_t*)fifo->data + (fifo->out & (fifo->size - 1)), l);
     // 复制剩下的数据
     memcpy(buffer + l, fifo->data, (len - l));
     fifo->out += len; //将 fifo 出列的位置 out 更新
-    return len;	//返回len长度
+    return len;	//返回 len 长度
 }
 
 static int _fifo_touch(shm_fifo_t *fifo, uint32_t pos, void *items, uint32_t len)
@@ -73,7 +74,7 @@ static int _fifo_touch(shm_fifo_t *fifo, uint32_t pos, void *items, uint32_t len
     {
         return out;
     }
-    //获取 fifo当前出列到out位置
+    //获取 fifo 当前出列到 out 位置
     if(items != NULL)
     {
         uint32_t l = min(len, fifo->size - (out & (fifo->size - 1)));
@@ -82,7 +83,7 @@ static int _fifo_touch(shm_fifo_t *fifo, uint32_t pos, void *items, uint32_t len
         // 复制剩下的数据
         memcpy(buffer + l, fifo->data, (len - l));
     }
-    return len + out;	//返回len长度
+    return len + out;	//返回 len 长度
 }
 
 static int _fifo_drop(shm_fifo_t *fifo, uint32_t len)
@@ -231,6 +232,7 @@ bool shm_publish(shm_t *header, const char *channel, const void *data, uint32_t 
         msg.header.size = datalen;
         strcpy(msg.header.channel, channel);
         msg.header.msg_num = ++ header->last_msg_num;
+        dbg(DBG_LCM, "msg.header.msg_num: %d\n", msg.header.msg_num);
         if(msg.header.msg_num == 0)
         {
             msg.header.msg_num = ++ header->last_msg_num;

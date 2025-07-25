@@ -2,32 +2,24 @@
 
 include(FindPackageHandleStandardArgs)
 
+# This is set because `find_package_handle_standard_args` is also used for each
+# component of GLib2, e.g., `GLib2_glid`, `GLib2_gio`, etc.
+set(FPHSA_NAME_MISMATCHED TRUE)
+
 #------------------------------------------------------------------------------
 function(_glib2_find_include VAR HEADER)
   list(APPEND CMAKE_PREFIX_PATH $ENV{GLIB_PATH})
+
   set(_paths)
   foreach(_lib ${ARGN})
     get_filename_component(_libpath ${GLIB2_${_lib}_LIBRARY} DIRECTORY)
-    message(STATUS "Library path for ${_lib}: ${_libpath}")
     list(APPEND _paths ${_libpath})
   endforeach()
-  message(STATUS "_paths: ${_paths}")
-  message(STATUS "VAR: ${VAR}")
-  message(STATUS "HEADER: ${HEADER}")
 
-    # 打印所有搜索路径
-    foreach(_path ${_paths})
-    message(STATUS "Searching in path: ${_path}")
-    foreach(_suffix glib-2.0 glib-2.0/include)
-      message(STATUS "Searching in path with suffix: ${_path}/${_suffix}")
-    endforeach()
-  endforeach()
-  
   find_path(GLIB2_${VAR}_INCLUDE_DIR ${HEADER}
     PATHS ${_paths}
     PATH_SUFFIXES glib-2.0 glib-2.0/include
   )
-  message(STATUS "GLIB2_${VAR}_INCLUDE_DIR: ${GLIB2_${VAR}_INCLUDE_DIR}")
   mark_as_advanced(GLIB2_${VAR}_INCLUDE_DIR)
 endfunction()
 
@@ -57,7 +49,6 @@ function(_glib2_add_target TARGET LIBRARY)
   endforeach()
 
   find_package_handle_standard_args(GLib2_${TARGET}
-    FOUND_VAR GLib2_${TARGET}_FOUND
     REQUIRED_VARS ${_deps}
   )
 
@@ -78,6 +69,24 @@ function(_glib2_add_target TARGET LIBRARY)
 endfunction()
 
 ###############################################################################
+
+find_package(PkgConfig)
+
+if(${PkgConfig_FOUND})
+
+  pkg_check_modules(GLIB glib-2.0)
+
+  if(${GLIB_FOUND})
+    add_library(GLib2::glib UNKNOWN IMPORTED)
+    set_target_properties(GLib2::glib PROPERTIES
+      IMPORTED_LOCATION "${pkgcfg_lib_GLIB_glib-2.0}"
+      INTERFACE_COMPILE_OPTIONS "${GLIB_CFLAGS_OTHER}"
+      INTERFACE_INCLUDE_DIRECTORIES "${GLIB_INCLUDE_DIRS}"
+    )
+    return()
+  endif()
+
+endif()
 
 _glib2_find_library(GLIB glib)
 _glib2_find_include(GLIB glib.h)
